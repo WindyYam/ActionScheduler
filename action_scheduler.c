@@ -359,6 +359,7 @@ bool ActionScheduler_Clear()
     mNodeStartIdx = 0;
     mNodeEndIdx = 0;
     mActiveNodes = 0;
+    mProceedingTime = 0;
     ListUnlock();
     return true;
 }

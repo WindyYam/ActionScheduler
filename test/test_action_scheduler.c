@@ -76,6 +76,8 @@ void test_ActionScheduler_IsCallbackArmed() {
     ActionScheduler_Proceed(100);
     TEST_ASSERT_FALSE(ActionScheduler_IsCallbackArmed(callback1));
     TEST_ASSERT_TRUE(ActionScheduler_IsCallbackArmed(callback2));
+    ActionScheduler_Proceed(300);
+    TEST_ASSERT_TRUE(ActionScheduler_IsCallbackArmed(callback2));
 }
 
 #define NUM_CALLBACKS 64

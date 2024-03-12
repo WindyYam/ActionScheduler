@@ -16,7 +16,7 @@
 #include <stddef.h>
 
 // For __packed struct
-#if defined ( __CC_ARM ) || defined (__ARMCC_VERSION) || (defined (__ARM__) && defined ( __GNUC__ )) || defined ( __ICCARM__ ) || defined ( __TI_ARM__ )
+#if defined ( __CC_ARM ) || defined (__ARMCC_VERSION) || (defined (__arm__) && defined ( __GNUC__ )) || defined ( __ICCARM__ ) || defined ( __TI_ARM__ )
 #include <cmsis_compiler.h>
 #else
 #define __PACKED_STRUCT struct

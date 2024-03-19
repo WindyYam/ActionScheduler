@@ -17,5 +17,5 @@ FetchContent_MakeAvailable(unity)
 add_library(action_scheduler ../action_scheduler.c)
 include_directories(../)
 # Add the test executable
-add_executable(test_action_scheduler ../test_action_scheduler.c)
+add_executable(test_action_scheduler test_action_scheduler.c)
 target_link_libraries(test_action_scheduler action_scheduler unity)

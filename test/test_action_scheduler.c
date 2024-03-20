@@ -117,6 +117,13 @@ void test_ActionScheduler_LargeNumberOfCallbacks() {
     }
 }
 
+void test_ActionScheduler_UnscheduleFinishedAction() {
+    ActionScheduler_Clear();
+    ActionSchedulerId_t id1 = ActionScheduler_Schedule(100, callback1, NULL);
+    TEST_ASSERT_TRUE(ActionScheduler_Proceed(100));
+    TEST_ASSERT_FALSE(ActionScheduler_UnscheduleById(&id1));
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_ActionScheduler_Schedule);
@@ -126,5 +133,6 @@ int main() {
     RUN_TEST(test_ActionScheduler_GetProceedingTime);
     RUN_TEST(test_ActionScheduler_IsCallbackArmed);
     RUN_TEST(test_ActionScheduler_LargeNumberOfCallbacks);
+    RUN_TEST(test_ActionScheduler_UnscheduleFinishedAction);
     return UNITY_END();
 }

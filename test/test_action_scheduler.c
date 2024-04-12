@@ -32,33 +32,33 @@ void test_ActionScheduler_Schedule()
     TEST_ASSERT_EQUAL_UINT32(200, ActionScheduler_GetNextEventDelay());
 }
 
-void test_ActionScheduler_UnscheduleById()
+void test_ActionScheduler_Unschedule()
 {
     ActionScheduler_Clear();
     ActionSchedulerId_t id1 = ActionScheduler_Schedule(100, callback1, NULL);
     ActionSchedulerId_t id2 = ActionScheduler_Schedule(200, callback2, NULL);
-    TEST_ASSERT_TRUE(ActionScheduler_UnscheduleById(&id1));
+    TEST_ASSERT_TRUE(ActionScheduler_Unschedule(&id1));
     TEST_ASSERT_EQUAL_UINT32(200, ActionScheduler_GetNextEventDelay());
-    TEST_ASSERT_TRUE(ActionScheduler_UnscheduleById(&id2));
+    TEST_ASSERT_TRUE(ActionScheduler_Unschedule(&id2));
     id1 = ActionScheduler_Schedule(100, callback1, NULL);
     id1 = id1 & 0x0f; // Clear the used counter number
-    TEST_ASSERT_FALSE(ActionScheduler_UnscheduleById(&id1));
+    TEST_ASSERT_FALSE(ActionScheduler_Unschedule(&id1));
     TEST_ASSERT_EQUAL_UINT32(100, ActionScheduler_GetNextEventDelay());
 }
 
-void test_ActionScheduler_UnscheduleByCallback()
+void test_ActionScheduler_UnscheduleAll()
 {
     ActionScheduler_Clear();
     ActionScheduler_Schedule(100, callback1, NULL);
     ActionScheduler_Schedule(200, callback2, NULL);
-    TEST_ASSERT_TRUE(ActionScheduler_UnscheduleByCallback(callback1));
+    TEST_ASSERT_TRUE(ActionScheduler_UnscheduleAll(callback1));
     TEST_ASSERT_EQUAL_UINT32(200, ActionScheduler_GetNextEventDelay());
 }
 
-void test_ActionScheduler_ScheduleWithReload()
+void test_ActionScheduler_ScheduleReload()
 {
     ActionScheduler_Clear();
-    ActionSchedulerId_t id1 = ActionScheduler_ScheduleWithReload(100, 300, callback2, NULL);
+    ActionSchedulerId_t id1 = ActionScheduler_ScheduleReload(100, 300, callback2, NULL);
     TEST_ASSERT_NOT_EQUAL(ACTION_SCHEDULER_ID_INVALID, id1);
     TEST_ASSERT_EQUAL_UINT32(100, ActionScheduler_GetNextEventDelay());
 
@@ -133,7 +133,7 @@ void test_ActionScheduler_LargeNumberOfCallbacks()
     // Unschedule remaining callbacks
     for (int i = 0; i < NUM_CALLBACKS; i++)
     {
-        ActionScheduler_UnscheduleById(&ids[i]);
+        ActionScheduler_Unschedule(&ids[i]);
     }
 }
 
@@ -142,16 +142,16 @@ void test_ActionScheduler_UnscheduleFinishedAction()
     ActionScheduler_Clear();
     ActionSchedulerId_t id1 = ActionScheduler_Schedule(100, callback1, NULL);
     TEST_ASSERT_TRUE(ActionScheduler_Proceed(100));
-    TEST_ASSERT_FALSE(ActionScheduler_UnscheduleById(&id1));
+    TEST_ASSERT_FALSE(ActionScheduler_Unschedule(&id1));
 }
 
 int main()
 {
     UNITY_BEGIN();
     RUN_TEST(test_ActionScheduler_Schedule);
-    RUN_TEST(test_ActionScheduler_UnscheduleById);
-    RUN_TEST(test_ActionScheduler_UnscheduleByCallback);
-    RUN_TEST(test_ActionScheduler_ScheduleWithReload);
+    RUN_TEST(test_ActionScheduler_Unschedule);
+    RUN_TEST(test_ActionScheduler_UnscheduleAll);
+    RUN_TEST(test_ActionScheduler_ScheduleReload);
     RUN_TEST(test_ActionScheduler_GetProceedingTime);
     RUN_TEST(test_ActionScheduler_IsCallbackArmed);
     RUN_TEST(test_ActionScheduler_LargeNumberOfCallbacks);

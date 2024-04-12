@@ -1,11 +1,10 @@
 #include <stdio.h>
-#include <stdarg.h>
 #include "app_framework.h"
 #include "action_scheduler.h"
 #include "critical_section.h"
 
-#define MIN_WAKEUP_SAFEZONE_MS 0
-#define MIN_SUSPEND_TIME_DELAY 1
+#define MIN_WAKEUP_SAFEZONE_MS 0U
+#define MIN_SUSPEND_TIME_DELAY 1U
 
 // This app_framework is mainly for a wrapper environment to run action scheduler as app/task/event framework, and manage low power mode sleep time based on event scheduling
 static uint32_t lastHalTick = 0;
@@ -16,7 +15,7 @@ static uint8_t powerLockRecursive = 0;  // Enable low power when lock is 0
 #endif
 static bool suspendedLastRound = false;
 // This module assumes a 32768hz RTC
-static RTC_HandleTypeDef rtc;
+static RTC_HandleTypeDef* rtc = NULL;
 
 // used to abort the suspend if the timeline has updated due to interrupt and nearest event delay is now less than suspendTime
 static bool ShouldAbortSuspend(uint32_t suspendTime)
@@ -38,13 +37,13 @@ __attribute__((weak)) void AppFramework_PostSuspendHook()
 
 static void Suspend(uint32_t timeInMs, bool* updateFlag)
 {
-  timeInMs = timeInMs > MIN_WAKEUP_SAFEZONE_MS ? timeInMs - MIN_WAKEUP_SAFEZONE_MS : 0;   // A safezone to wake up a little bit earlier
+  timeInMs = timeInMs > MIN_WAKEUP_SAFEZONE_MS ? timeInMs - MIN_WAKEUP_SAFEZONE_MS : 0U;   // A safezone to wake up a little bit earlier
   const uint32_t clk = 2048;  // 2048HZ RTC wakeup clock (32768 / DIV16)
   // The RTC alarm can have only UINT16_MAX count number
-  uint32_t cnt = (timeInMs >= (UINT16_MAX * 1000 / clk))? UINT16_MAX : timeInMs * clk / 1000;
+  uint32_t cnt = (timeInMs >= (UINT16_MAX * 1000U / clk))? UINT16_MAX : timeInMs * clk / 1000U;
   if(cnt >= MIN_SUSPEND_TIME_DELAY)
   {
-    uint32_t msTime = cnt * 1000 / clk;
+    uint32_t msTime = cnt * 1000U / clk;
     DEBUG_PRINTF("Sleep for %dms...\n", msTime);
     AppFramework_PreSuspendHook();
     Enter_Critical();
@@ -58,7 +57,7 @@ static void Suspend(uint32_t timeInMs, bool* updateFlag)
     }
     *updateFlag = true;
     HAL_SuspendTick();
-    HAL_RTCEx_SetWakeUpTimer_IT(&rtc, cnt - 1, RTC_WAKEUPCLOCK_RTCCLK_DIV16);
+    (void)HAL_RTCEx_SetWakeUpTimer_IT(rtc, cnt - 1U, RTC_WAKEUPCLOCK_RTCCLK_DIV16);
 #ifdef USE_STOP1_MODE
     HAL_PWR_EnterSTOPMode(PWR_LOWPOWERREGULATOR_ON, PWR_STOPENTRY_WFI);
 #else
@@ -66,7 +65,7 @@ static void Suspend(uint32_t timeInMs, bool* updateFlag)
     HAL_PWREx_DisableLowPowerRunMode();
 #endif
     // Waked up by any source
-    HAL_RTCEx_DeactivateWakeUpTimer(&rtc);
+    (void)HAL_RTCEx_DeactivateWakeUpTimer(rtc);
     HAL_ResumeTick();
     AppFramework_PostSuspendHook();
     Exit_Critical();
@@ -86,7 +85,7 @@ static inline uint32_t GetDurationToTimelineBeginning()
     }
     else
     {
-        return HAL_GetTick() - lastHalTick - ActionScheduler_GetProceedingTime();
+        return (HAL_GetTick() - lastHalTick) - ActionScheduler_GetProceedingTime();
     }
 }
 
@@ -95,7 +94,7 @@ uint32_t AppFramework_GetRTCDuration(uint32_t currentTimeStamp, uint32_t lastTim
     if (currentTimeStamp < lastTimeStamp)
     {
         // overflow, add the missing 24 hours back
-        currentTimeStamp += 24 * 3600000;
+        currentTimeStamp += 24U * 3600000U;
     }
     return currentTimeStamp - lastTimeStamp;
 }
@@ -104,9 +103,9 @@ uint32_t AppFramework_GetRTCTimestamp()
 {
     RTC_TimeTypeDef rtcTime;
     RTC_DateTypeDef rtcDate;
-    HAL_RTC_GetTime(&rtc, &rtcTime, RTC_FORMAT_BIN);
-    HAL_RTC_GetDate(&rtc, &rtcDate, RTC_FORMAT_BCD);
-    return rtcTime.Hours * 3600000 + rtcTime.Minutes * 60000 + rtcTime.Seconds * 1000 + 1000 * (rtcTime.SecondFraction - rtcTime.SubSeconds) / (rtcTime.SecondFraction + 1);
+    (void)HAL_RTC_GetTime(rtc, &rtcTime, RTC_FORMAT_BIN);
+    (void)HAL_RTC_GetDate(rtc, &rtcDate, RTC_FORMAT_BCD);
+    return (rtcTime.Hours * 3600000U) + (rtcTime.Minutes * (uint32_t)60000U) + (rtcTime.Seconds * (uint32_t)1000U) + ((1000U * (rtcTime.SecondFraction - rtcTime.SubSeconds)) / (rtcTime.SecondFraction + 1U));
 }
 
 void AppFramework_WakeLockRecursive(bool hold)
@@ -115,11 +114,11 @@ void AppFramework_WakeLockRecursive(bool hold)
     Enter_Critical();
     if(hold)
     {
-        powerLockRecursive += 1;
+        powerLockRecursive += 1U;
     }
     else
     {
-        powerLockRecursive -= 1;
+        powerLockRecursive -= 1U;
     }
     Exit_Critical();
     if(hold)
@@ -144,22 +143,22 @@ void AppFramework_WakeLockRecursive(bool hold)
 // 2. If the new event is scheduled by AppFramework_Schedule, the 5s proceed will fire the first event only, and another 1s passed the new event will fire, as AppFramework_Schedule is based on the current absolute time it executes
 ActionSchedulerId_t AppFramework_Schedule(uint32_t delayedTimeInMs, ActionCallback_t cb, void *arg)
 {
-    return ActionScheduler_ScheduleWithReload(GetDurationToTimelineBeginning() + delayedTimeInMs, delayedTimeInMs, cb, arg);
+    return ActionScheduler_ScheduleReload(GetDurationToTimelineBeginning() + delayedTimeInMs, delayedTimeInMs, cb, arg);
 }
 // If you want the reload to be different to the delay
-ActionSchedulerId_t AppFramework_ScheduleWithReload(uint32_t delayedTimeInMs, uint32_t reloadTimeInMs, ActionCallback_t cb, void *arg)
+ActionSchedulerId_t AppFramework_ScheduleReload(uint32_t delayedTimeInMs, uint32_t reloadTimeInMs, ActionCallback_t cb, void *arg)
 {
-    return ActionScheduler_ScheduleWithReload(GetDurationToTimelineBeginning() + delayedTimeInMs, reloadTimeInMs, cb, arg);
+    return ActionScheduler_ScheduleReload(GetDurationToTimelineBeginning() + delayedTimeInMs, reloadTimeInMs, cb, arg);
 }
 
-bool AppFramework_UnscheduleById(ActionSchedulerId_t *actionId)
+bool AppFramework_Unschedule(ActionSchedulerId_t *actionId)
 {
-    return ActionScheduler_UnscheduleById(actionId);
+    return ActionScheduler_Unschedule(actionId);
 }
 
-bool AppFramework_UnscheduleByCallback(ActionCallback_t cb)
+bool AppFramework_UnscheduleAll(ActionCallback_t cb)
 {
-    return ActionScheduler_UnscheduleByCallback(cb);
+    return ActionScheduler_UnscheduleAll(cb);
 }
 
 void AppFramework_SetSuspendEnable(bool en)
@@ -186,19 +185,9 @@ __attribute__((weak)) void DEBUG_PRINTF_NOBUFFER(const char* fmt, ...)
     va_end(argptr);
 }
 
-void AppFramework_Init()
+void AppFramework_Init(RTC_HandleTypeDef* hrtc)
 {
-    rtc.Instance = RTC;
-    rtc.Init.HourFormat = RTC_HOURFORMAT_24;
-    rtc.Init.AsynchPrediv = 127;
-    rtc.Init.SynchPrediv = 255;
-    rtc.Init.OutPut = RTC_OUTPUT_DISABLE;
-    rtc.Init.OutPutRemap = RTC_OUTPUT_REMAP_NONE;
-    rtc.Init.OutPutPolarity = RTC_OUTPUT_POLARITY_HIGH;
-    rtc.Init.OutPutType = RTC_OUTPUT_TYPE_OPENDRAIN;
-    rtc.Init.OutPutPullUp = RTC_OUTPUT_PULLUP_NONE;
-    HAL_RTC_Init(&rtc);
-
+    rtc = hrtc;
     ActionScheduler_Clear();
     lastRtcTick = AppFramework_GetRTCTimestamp();
     lastHalTick = HAL_GetTick();
@@ -225,12 +214,12 @@ void AppFramework_Loop()
     {
         uint32_t elapsed = AppFramework_GetRTCDuration(rtctick, lastRtcTick);
         DEBUG_PRINTF("Wake up from %dms\n", elapsed);
-        ActionScheduler_Proceed(elapsed);
+        (void)ActionScheduler_Proceed(elapsed);
         suspendedLastRound = false;
     }
     else
     {
-        ActionScheduler_Proceed(haltick - lastHalTick);
+        (void)ActionScheduler_Proceed(haltick - lastHalTick);
     }
 
     // Synchronize the timestamp and proceeding time, lock needed here as no ISR schedule is allowed in between
@@ -249,9 +238,4 @@ void AppFramework_Loop()
             Suspend(nextEventDelay, &suspendedLastRound);
         }
     }
-}
-
-void RTC_TAMP_IRQHandler(void)
-{
-  HAL_RTCEx_WakeUpTimerIRQHandler(&rtc);
 }

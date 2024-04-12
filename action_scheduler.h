@@ -1,5 +1,5 @@
-#ifndef __ACTION_SCHEDULER_H
-#define __ACTION_SCHEDULER_H
+#ifndef ACTION_SCHEDULER_H
+#define ACTION_SCHEDULER_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -9,14 +9,14 @@ extern "C" {
 #include <stdbool.h>
 
 #ifndef MAX_ACTION_SCHEDULER_NODES
-#define MAX_ACTION_SCHEDULER_NODES 64
+#define MAX_ACTION_SCHEDULER_NODES 64U
 #endif
 
 #if MAX_ACTION_SCHEDULER_NODES > 255
 #error MAX_ACTION_SCHEDULER_NODES can not exceed 255! For now
 #endif
 
-#define ACTION_SCHEDULER_ID_INVALID 0
+#define ACTION_SCHEDULER_ID_INVALID 0U
 
 typedef enum{
     ACTION_ONESHOT,
@@ -26,12 +26,12 @@ typedef enum{
 typedef ActionReturn_t (*ActionCallback_t)(void* arg);
 typedef uint16_t ActionSchedulerId_t;
 
-bool ActionScheduler_Proceed(uint32_t timeElapsedMsSinceLastCall);
-ActionSchedulerId_t ActionScheduler_Schedule(uint32_t delayedTimeInMs, ActionCallback_t cb, void* arg);
-ActionSchedulerId_t ActionScheduler_ScheduleWithReload(uint32_t delayedTime, uint32_t reload, ActionCallback_t cb, void* arg);
-bool ActionScheduler_UnscheduleById(ActionSchedulerId_t* actionId);
-bool ActionScheduler_UnscheduleByCallback(ActionCallback_t cb);
-bool ActionScheduler_Clear(void);
+bool ActionScheduler_Proceed(uint32_t timeElapsedMs);
+ActionSchedulerId_t ActionScheduler_Schedule(uint32_t delayedTime, ActionCallback_t cb, void* arg);
+ActionSchedulerId_t ActionScheduler_ScheduleReload(uint32_t delayedTime, uint32_t reload, ActionCallback_t cb, void* arg);
+bool ActionScheduler_Unschedule(ActionSchedulerId_t* actionId);
+bool ActionScheduler_UnscheduleAll(ActionCallback_t cb);
+void ActionScheduler_Clear(void);
 uint32_t ActionScheduler_GetNextEventDelay(void);
 uint32_t ActionScheduler_GetProceedingTime(void);
 void ActionScheduler_ClearProceedingTime(void);
@@ -40,4 +40,4 @@ bool ActionScheduler_IsCallbackArmed(ActionCallback_t cb);
 #ifdef __cplusplus
 }
 #endif
-#endif /* __ACTION_SCHEDULER_H */
+#endif /* ACTION_SCHEDULER_H */

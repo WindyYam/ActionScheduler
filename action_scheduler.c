@@ -1,3 +1,6 @@
+//
+// Author: zhenya.y@lx-group.com.au
+//
 // The main purpose of this module is to provide a convenient way of scheduling a delayed function call or periodic function call
 // This module use a timeline based linked list to manage the schedule function calls. The linked list is statically allocated in an array without heap involved
 // The earlier node will always be closer to the (logical) head, later node to the (logical) tail
@@ -53,7 +56,7 @@ static inline bool getFreeSlot(uint8_t* slotIdx)
 {
     bool ret = false;
     //find next available slot starting from the end
-    for (uint8_t i = (mNodeEndIdx + 1) % MAX_ACTION_SCHEDULER_NODES; i != mNodeEndIdx; i = (i + 1) % MAX_ACTION_SCHEDULER_NODES)
+    for (uint8_t i = (mNodeEndIdx + 1U) % MAX_ACTION_SCHEDULER_NODES; i != mNodeEndIdx; i = (i + 1U) % MAX_ACTION_SCHEDULER_NODES)
     {
         if (mNodes[i].callback == NULL)
         {
@@ -67,76 +70,83 @@ static inline bool getFreeSlot(uint8_t* slotIdx)
 
 static inline uint16_t generateActionIdAt(uint8_t idx)
 {
-    return idx | (mNodes[idx].usedCounter << 8);
+    return idx | ((uint16_t)mNodes[idx].usedCounter << 8);
 }
 
 static inline void removeNodeAt(uint8_t idx)
 {
-    mNodes[idx].callback = NULL;
-    if (mActiveNodes > 1)
+    if(idx < MAX_ACTION_SCHEDULER_NODES)
     {
-        if (idx == mNodeStartIdx)
+        mNodes[idx].callback = NULL;
+        if (mActiveNodes > 1U)
         {
-            uint8_t nextCursor = mNodes[idx].nextNodeIdx;
-            mNodes[nextCursor].previousNodeIdx = nextCursor;
-            mActiveNodes -= 1;
-            uint32_t timeleft = mNodes[mNodeStartIdx].delayToPrevious;
-            mNodeStartIdx = nextCursor;
-            mNodes[mNodeStartIdx].delayToPrevious += timeleft;
+            if (idx == mNodeStartIdx)
+            {
+                uint8_t nextCursor = mNodes[idx].nextNodeIdx;
+                mNodes[nextCursor].previousNodeIdx = nextCursor;
+                mActiveNodes -= 1U;
+                uint32_t timeleft = mNodes[mNodeStartIdx].delayToPrevious;
+                mNodeStartIdx = nextCursor;
+                mNodes[mNodeStartIdx].delayToPrevious += timeleft;
+            }
+            else if (idx == mNodeEndIdx)
+            {
+                uint8_t previousCursor = mNodes[idx].previousNodeIdx;
+                mNodes[previousCursor].nextNodeIdx = previousCursor;
+                mNodeEndIdx = previousCursor;
+                mActiveNodes -= 1U;
+            }
+            else
+            {
+                if((mNodes[idx].previousNodeIdx == idx) && (mNodes[idx].nextNodeIdx == idx))
+                {
+                    // this is not the start node nor the end node, but its next and previous are itself, means this is an isolated node not in the timeline
+                    // could be the product of a reschedule in the middle i.e. from a ActionScheduler callback, nothing to do for the timeline
+                    return;
+                }
+                uint8_t previousCursor = mNodes[idx].previousNodeIdx;
+                uint8_t nextCursor = mNodes[idx].nextNodeIdx;
+                mNodes[previousCursor].nextNodeIdx = nextCursor;
+                mNodes[nextCursor].previousNodeIdx = previousCursor;
+                mNodes[nextCursor].delayToPrevious += mNodes[idx].delayToPrevious;
+                mActiveNodes -= 1U;
+            }
         }
-        else if (idx == mNodeEndIdx)
+        else if (mActiveNodes == 1U)
         {
-            uint8_t previousCursor = mNodes[idx].previousNodeIdx;
-            mNodes[previousCursor].nextNodeIdx = previousCursor;
-            mNodeEndIdx = previousCursor;
-            mActiveNodes -= 1;
+            if(idx != mNodeStartIdx)
+            {
+                // This is an isolated node
+                return;
+            }
+            //only the head node
+            mActiveNodes = 0;
+            mNodeStartIdx = idx;
+            mNodeEndIdx = idx;
         }
         else
         {
-            if(mNodes[idx].previousNodeIdx == idx && mNodes[idx].nextNodeIdx == idx)
-            {
-                // this is not the start node nor the end node, but its next and previous are itself, means this is an isolated node not in the timeline
-                // could be the product of a reschedule in the middle i.e. from a ActionScheduler callback, nothing to do for the timeline
-                return;
-            }
-            uint8_t previousCursor = mNodes[idx].previousNodeIdx;
-            uint8_t next_cursor = mNodes[idx].nextNodeIdx;
-            mNodes[previousCursor].nextNodeIdx = next_cursor;
-            mNodes[next_cursor].previousNodeIdx = previousCursor;
-            mNodes[next_cursor].delayToPrevious += mNodes[idx].delayToPrevious;
-            mActiveNodes -= 1;
+            // No node, do nothing
         }
-    }
-    else if (mActiveNodes == 1)
-    {
-        if(idx != mNodeStartIdx)
-        {
-            // This is an isolated node
-            return;
-        }
-        //only the head node
-        mActiveNodes = 0;
-        mNodeStartIdx = idx;
-        mNodeEndIdx = idx;
     }
 }
 
-static inline uint32_t insertNode(uint8_t idx, uint32_t delay)
+static inline void insertNode(uint8_t idx, uint32_t delay)
 {
-    int16_t idxA = -1, idxB = mNodeStartIdx;
+    int16_t idxA = -1, idxB = (int16_t)mNodeStartIdx;
     //find the correct location for the new node in the linked list, starting from first node
     while (mNodes[idxB].delayToPrevious <= delay)
     {
         delay = delay - mNodes[idxB].delayToPrevious;
         idxA = idxB;
-        if (idxB == mNodeEndIdx) //end
+        if (idxB == (int16_t)mNodeEndIdx) //end
         {
             idxB = -1;
             break;
         }
         else
         {
-            idxB = mNodes[idxB].nextNodeIdx;
+            idxB = (int16_t)mNodes[idxB].nextNodeIdx;
         }
     }
     mNodes[idx].delayToPrevious = delay;
@@ -169,70 +179,66 @@ static inline uint32_t insertNode(uint8_t idx, uint32_t delay)
     }
 }
 
-static inline void processCallback(void)
-{
-    uint8_t currentCursor = mNodeStartIdx;
-    mActiveNodes -= 1;
-    ActionCallback_t cb = mNodes[currentCursor].callback;
-    void* arg = mNodes[currentCursor].arg;
-    if (mActiveNodes > 0)
-    {
-        // isolate the node out from the timeline
-        uint8_t nextCursor = mNodes[currentCursor].nextNodeIdx;
-        mNodes[nextCursor].previousNodeIdx = nextCursor;
-        mNodeStartIdx = nextCursor;
-        mNodes[currentCursor].nextNodeIdx = currentCursor;
-    }
-    else
-    {
-        mNodes[currentCursor].nextNodeIdx = currentCursor;
-    }
-    // This whole function should be inside the lock, but here we need to unlock as for the callback chain
-    ListUnlock();
-    ActionReturn_t ret = cb(arg);
-    ListLock();
-    switch(ret)
-    {
-        case ACTION_ONESHOT:
-            mNodes[currentCursor].callback = NULL;
-        break;
-        case ACTION_RELOAD:
-            // The callback can unschedule this, result in callback changed to null, we need to check this
-            if(mNodes[currentCursor].callback)
-            {
-                if (mActiveNodes == 0) //the linked list is empty, this is the first node
-                {
-                    mNodes[currentCursor].delayToPrevious = mNodes[currentCursor].reload;
-                }
-                else
-                {
-                    insertNode(currentCursor, mNodes[currentCursor].reload);
-                }
-                mActiveNodes++;
-            }
-        break;
-        default:
-        break;
-    }
-}
-
-bool ActionScheduler_Proceed(uint32_t timeToProceed)
+bool ActionScheduler_Proceed(uint32_t timeElapsedMs)
 {
     bool ret = false;
     ListLock();
 
-    while (timeToProceed >= mNodes[mNodeStartIdx].delayToPrevious && mActiveNodes > 0)
+    while ((timeElapsedMs >= mNodes[mNodeStartIdx].delayToPrevious) && (mActiveNodes > 0U))
     {
-        timeToProceed -= mNodes[mNodeStartIdx].delayToPrevious;
+        timeElapsedMs -= mNodes[mNodeStartIdx].delayToPrevious;
         mProceedingTime += mNodes[mNodeStartIdx].delayToPrevious;
-        processCallback();
+        uint8_t currentCursor = mNodeStartIdx;
+        mActiveNodes -= 1U;
+        ActionCallback_t cb = mNodes[currentCursor].callback;
+        void* arg = mNodes[currentCursor].arg;
+        if (mActiveNodes > 0U)
+        {
+            // isolate the node out from the timeline
+            uint8_t nextCursor = mNodes[currentCursor].nextNodeIdx;
+            mNodes[nextCursor].previousNodeIdx = nextCursor;
+            mNodeStartIdx = nextCursor;
+            mNodes[currentCursor].nextNodeIdx = currentCursor;
+        }
+        else
+        {
+            mNodes[currentCursor].nextNodeIdx = currentCursor;
+        }
+        // This whole function should be inside the lock, but here we need to unlock as for the callback chain
+        ListUnlock();
+        ActionReturn_t actionRet = cb(arg);
+        ListLock();
+        switch(actionRet)
+        {
+            case ACTION_ONESHOT:
+                mNodes[currentCursor].callback = NULL;
+            break;
+            case ACTION_RELOAD:
+                // The callback can unschedule this, result in callback changed to null, we need to check this
+                if(mNodes[currentCursor].callback != NULL)
+                {
+                    if (mActiveNodes == 0U) //the linked list is empty, this is the first node
+                    {
+                        mNodes[currentCursor].delayToPrevious = mNodes[currentCursor].reload;
+                    }
+                    else
+                    {
+                        insertNode(currentCursor, mNodes[currentCursor].reload);
+                    }
+                    mActiveNodes++;
+                }
+            break;
+            default:
+                // Nothing
+            break;
+        }
         ret = true;
     }
 
-    if (mActiveNodes > 0)
+    if (mActiveNodes > 0U)
     {
-        mNodes[mNodeStartIdx].delayToPrevious -= timeToProceed;
-        mProceedingTime += timeToProceed;
+        mNodes[mNodeStartIdx].delayToPrevious -= timeElapsedMs;
+        mProceedingTime += timeElapsedMs;
     }
     
     ListUnlock();
@@ -240,25 +246,25 @@ bool ActionScheduler_Proceed(uint32_t timeToProceed)
 }
 
 // The delay is relative to the current head of the linked list, or timeline
-// delayedTime is the initial delay you want to fire the callback, reload is the reload value when callback returns true. Sometimes you would like them to be different
-ActionSchedulerId_t ActionScheduler_ScheduleWithReload(uint32_t delayedTime, uint32_t reload, ActionCallback_t cb, void* arg)
+// delayedTime is the initial delay you want to fire the callback, reload is the reload value for next call when callback returns ACTION_RELOAD. Sometimes you would like them to be different
+ActionSchedulerId_t ActionScheduler_ScheduleReload(uint32_t delayedTime, uint32_t reload, ActionCallback_t cb, void* arg)
 {
     uint16_t ActionSchedulerId = ACTION_SCHEDULER_ID_INVALID;
-    if (cb == NULL || mActiveNodes >= MAX_ACTION_SCHEDULER_NODES)
+    if ((cb == NULL) || (mActiveNodes >= MAX_ACTION_SCHEDULER_NODES))
     {
         return ActionSchedulerId;
     }
     
     // The algorithm basically insert the new Node into existing timeline of linked list
     ListLock();
-    if (mActiveNodes == 0) //the linked list is empty, this is the first node
+    if (mActiveNodes == 0U) //the linked list is empty, this is the first node
     {
         // In case of a reserved node which is used in periodic scheduling, we need to look for a one with empty callback
         uint8_t freeCursor = mNodeStartIdx;
         if(!getFreeSlot(&freeCursor))
         {
             ListUnlock();
-            return false;
+            return ACTION_SCHEDULER_ID_INVALID;
         }
         mNodes[freeCursor].usedCounter++;
         mNodes[freeCursor].previousNodeIdx = freeCursor;
@@ -269,7 +275,7 @@ ActionSchedulerId_t ActionScheduler_ScheduleWithReload(uint32_t delayedTime, uin
         mNodes[freeCursor].reload = reload;
         mNodeStartIdx = freeCursor;
         mNodeEndIdx = freeCursor;
-        mActiveNodes += 1;
+        mActiveNodes += 1U;
         ActionSchedulerId = generateActionIdAt(freeCursor);
     }
     else
@@ -278,7 +284,7 @@ ActionSchedulerId_t ActionScheduler_ScheduleWithReload(uint32_t delayedTime, uin
         if(!getFreeSlot(&freeCursor))
         {
             ListUnlock();
-            return false;
+            return ACTION_SCHEDULER_ID_INVALID;
         }
 
         mNodes[freeCursor].usedCounter++;
@@ -286,7 +292,7 @@ ActionSchedulerId_t ActionScheduler_ScheduleWithReload(uint32_t delayedTime, uin
         mNodes[freeCursor].arg = arg;
         mNodes[freeCursor].delayToPrevious = delayedTime;
         mNodes[freeCursor].reload = reload;
-        mActiveNodes += 1;
+        mActiveNodes += 1U;
 
         insertNode(freeCursor, delayedTime);
         ActionSchedulerId = generateActionIdAt(freeCursor);
@@ -297,24 +303,24 @@ ActionSchedulerId_t ActionScheduler_ScheduleWithReload(uint32_t delayedTime, uin
 
 ActionSchedulerId_t ActionScheduler_Schedule(uint32_t delayedTime, ActionCallback_t cb, void* arg)
 {
-    return ActionScheduler_ScheduleWithReload(delayedTime, delayedTime, cb, arg);
+    return ActionScheduler_ScheduleReload(delayedTime, delayedTime, cb, arg);
 }
 
 // The safety for the unscheduling is enforced by a local counter in each node, but the counter still round back after exactly 256 schedule calls
 // Keep that in mind, bad luck exists, but generally it is safe to do an unschedule to a finished ActionScheduler
-bool ActionScheduler_UnscheduleById(ActionSchedulerId_t* ActionSchedulerId)
+bool ActionScheduler_Unschedule(ActionSchedulerId_t* actionId)
 {
     bool ret = false;
-    if (*ActionSchedulerId != ACTION_SCHEDULER_ID_INVALID)
+    if (*actionId != ACTION_SCHEDULER_ID_INVALID)
     {
         ListLock();
-        uint8_t id = *ActionSchedulerId & 0xff;
-        uint8_t counter = *ActionSchedulerId >> 8;
-        if (mNodes[id].callback != NULL && mNodes[id].usedCounter == counter)
+        uint8_t id = (uint8_t)(*actionId & 0xffU);
+        uint8_t counter = (uint8_t)(*actionId >> 8U);
+        if ((id < MAX_ACTION_SCHEDULER_NODES) && (mNodes[id].callback != NULL) && (mNodes[id].usedCounter == counter))
         {
             ret = true;
             removeNodeAt(id);
-            *ActionSchedulerId = ACTION_SCHEDULER_ID_INVALID;
+            *actionId = ACTION_SCHEDULER_ID_INVALID;
         }
         ListUnlock();
     }
@@ -322,7 +328,7 @@ bool ActionScheduler_UnscheduleById(ActionSchedulerId_t* ActionSchedulerId)
 }
 
 // Relatively safer to the version that use ActionSchedulerId, and it traverse through all the internal linked list node
-bool ActionScheduler_UnscheduleByCallback(ActionCallback_t cb)
+bool ActionScheduler_UnscheduleAll(ActionCallback_t cb)
 {
     bool ret = false;
     ListLock();
@@ -343,30 +349,29 @@ bool ActionScheduler_UnscheduleByCallback(ActionCallback_t cb)
     return ret;
 }
 
-bool ActionScheduler_Clear()
+void ActionScheduler_Clear()
 {
     ListLock();
     for (uint16_t i = 0; i < MAX_ACTION_SCHEDULER_NODES; i++)
     {
-        mNodes[i].usedCounter = 0;
+        mNodes[i].usedCounter = 0U;
         mNodes[i].arg = NULL;
         mNodes[i].callback = NULL;
-        mNodes[i].delayToPrevious = 0;
-        mNodes[i].reload = 0;
-        mNodes[i].nextNodeIdx = 0;
-        mNodes[i].previousNodeIdx = 0;
+        mNodes[i].delayToPrevious = 0U;
+        mNodes[i].reload = 0U;
+        mNodes[i].nextNodeIdx = 0U;
+        mNodes[i].previousNodeIdx = 0U;
     }
     mNodeStartIdx = 0;
     mNodeEndIdx = 0;
     mActiveNodes = 0;
     mProceedingTime = 0;
     ListUnlock();
-    return true;
 }
 
 uint32_t ActionScheduler_GetNextEventDelay(void)
 {
-    if(mActiveNodes)
+    if(mActiveNodes > 0U)
     {
         return mNodes[mNodeStartIdx].delayToPrevious;
     }
@@ -390,7 +395,7 @@ bool ActionScheduler_IsCallbackArmed(ActionCallback_t cb)
     {
         return true;
     }
-    for (uint8_t i = (mNodeStartIdx + 1) % MAX_ACTION_SCHEDULER_NODES; i != mNodeStartIdx; i = (i + 1) % MAX_ACTION_SCHEDULER_NODES)
+    for (uint8_t i = (mNodeStartIdx + 1U) % MAX_ACTION_SCHEDULER_NODES; i != mNodeStartIdx; i = (i + 1U) % MAX_ACTION_SCHEDULER_NODES)
     {
         if (mNodes[i].callback == cb)
         {

@@ -64,11 +64,10 @@ static void Suspend(uint32_t timeInMs, bool* updateFlag)
     HAL_PWR_EnterSLEEPMode(PWR_LOWPOWERREGULATOR_ON, PWR_STOPENTRY_WFI);
     HAL_PWREx_DisableLowPowerRunMode();
 #endif
-    // Waked up by any source
-    (void)HAL_RTCEx_DeactivateWakeUpTimer(rtc);
+    Exit_Critical();
     HAL_ResumeTick();
     AppFramework_PostSuspendHook();
-    Exit_Critical();
+
   }
   else
   {

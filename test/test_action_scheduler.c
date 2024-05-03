@@ -1,8 +1,8 @@
 #include "action_scheduler.h"
 #include "unity.h"
 
-void Enter_Critical() {}
-void Exit_Critical() {}
+uint32_t Enter_Critical() {return 0;}
+void Exit_Critical(uint32_t lock) {}
 void setUp(void) {}    /* Is run before every test, put unit init calls here. */
 void tearDown(void) {} /* Is run after every test, put unit clean-up calls here. */
 // Callback functions for testing

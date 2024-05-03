@@ -43,13 +43,13 @@ static uint32_t mProceedingTime = 0;    // specific for scheduling inside callba
 
 // Lock/Unlock for interrupt/thread safety, if we want to use the functions in interrupt handler/multi threads
 // But if not, we don't need these
-static inline void ListLock(void)
+static inline uint32_t ListLock(void)
 {
-    Enter_Critical();
+    return Enter_Critical();
 }
-static inline void ListUnlock(void)
+static inline void ListUnlock(uint32_t arg)
 {
-    Exit_Critical();
+    Exit_Critical(arg);
 }
 
 static inline bool getFreeSlot(uint8_t* slotIdx)
@@ -182,7 +182,7 @@ static inline void insertNode(uint8_t idx, uint32_t delay)
 bool ActionScheduler_Proceed(uint32_t timeElapsedMs)
 {
     bool ret = false;
-    ListLock();
+    uint32_t lock = ListLock();
 
     while ((timeElapsedMs >= mNodes[mNodeStartIdx].delayToPrevious) && (mActiveNodes > 0U))
     {
@@ -205,9 +205,9 @@ bool ActionScheduler_Proceed(uint32_t timeElapsedMs)
             mNodes[currentCursor].nextNodeIdx = currentCursor;
         }
         // This whole function should be inside the lock, but here we need to unlock as for the callback chain
-        ListUnlock();
+        ListUnlock(lock);
         ActionReturn_t actionRet = cb(arg);
-        ListLock();
+        lock = ListLock();
         switch(actionRet)
         {
             case ACTION_ONESHOT:
@@ -241,7 +241,7 @@ bool ActionScheduler_Proceed(uint32_t timeElapsedMs)
         mProceedingTime += timeElapsedMs;
     }
     
-    ListUnlock();
+    ListUnlock(lock);
     return ret;
 }
 
@@ -256,14 +256,14 @@ ActionSchedulerId_t ActionScheduler_ScheduleReload(uint32_t delayedTime, uint32_
     }
     
     // The algorithm basically insert the new Node into existing timeline of linked list
-    ListLock();
+    uint32_t lock = ListLock();
     if (mActiveNodes == 0U) //the linked list is empty, this is the first node
     {
         // In case of a reserved node which is used in periodic scheduling, we need to look for a one with empty callback
         uint8_t freeCursor = mNodeStartIdx;
         if(!getFreeSlot(&freeCursor))
         {
-            ListUnlock();
+            ListUnlock(lock);
             return ACTION_SCHEDULER_ID_INVALID;
         }
         mNodes[freeCursor].usedCounter++;
@@ -283,7 +283,7 @@ ActionSchedulerId_t ActionScheduler_ScheduleReload(uint32_t delayedTime, uint32_
         uint8_t freeCursor = mNodeEndIdx;
         if(!getFreeSlot(&freeCursor))
         {
-            ListUnlock();
+            ListUnlock(lock);
             return ACTION_SCHEDULER_ID_INVALID;
         }
 
@@ -297,7 +297,7 @@ ActionSchedulerId_t ActionScheduler_ScheduleReload(uint32_t delayedTime, uint32_
         insertNode(freeCursor, delayedTime);
         ActionSchedulerId = generateActionIdAt(freeCursor);
     }
-    ListUnlock();
+    ListUnlock(lock);
     return ActionSchedulerId;
 }
 
@@ -313,7 +313,7 @@ bool ActionScheduler_Unschedule(ActionSchedulerId_t* actionId)
     bool ret = false;
     if (*actionId != ACTION_SCHEDULER_ID_INVALID)
     {
-        ListLock();
+        uint32_t lock = ListLock();
         uint8_t id = (uint8_t)(*actionId & 0xffU);
         uint8_t counter = (uint8_t)(*actionId >> 8U);
         if ((id < MAX_ACTION_SCHEDULER_NODES) && (mNodes[id].callback != NULL) && (mNodes[id].usedCounter == counter))
@@ -322,7 +322,7 @@ bool ActionScheduler_Unschedule(ActionSchedulerId_t* actionId)
             removeNodeAt(id);
             *actionId = ACTION_SCHEDULER_ID_INVALID;
         }
-        ListUnlock();
+        ListUnlock(lock);
     }
     return ret;
 }
@@ -331,7 +331,7 @@ bool ActionScheduler_Unschedule(ActionSchedulerId_t* actionId)
 bool ActionScheduler_UnscheduleAll(ActionCallback_t cb)
 {
     bool ret = false;
-    ListLock();
+    uint32_t lock = ListLock();
     uint8_t currentCursor = mNodeStartIdx;
     uint8_t nextCursor = currentCursor;
     bool isEnd;
@@ -345,13 +345,13 @@ bool ActionScheduler_UnscheduleAll(ActionCallback_t cb)
             removeNodeAt(currentCursor);
         }
     } while (!isEnd);
-    ListUnlock();
+    ListUnlock(lock);
     return ret;
 }
 
 void ActionScheduler_Clear()
 {
-    ListLock();
+    uint32_t lock = ListLock();
     for (uint16_t i = 0; i < MAX_ACTION_SCHEDULER_NODES; i++)
     {
         mNodes[i].usedCounter = 0U;
@@ -366,7 +366,7 @@ void ActionScheduler_Clear()
     mNodeEndIdx = 0;
     mActiveNodes = 0;
     mProceedingTime = 0;
-    ListUnlock();
+    ListUnlock(lock);
 }
 
 uint32_t ActionScheduler_GetNextEventDelay(void)

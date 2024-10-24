@@ -1,5 +1,5 @@
 //
-// Author: zhenya.y@lx-group.com.au
+// Author: windy.yam0@gmail.com
 //
 // The main purpose of this module is to provide a convenient way of scheduling a delayed function call or periodic function call
 // This module use a timeline based linked list to manage the schedule function calls. The linked list is statically allocated in an array without heap involved

@@ -19,15 +19,12 @@ In multithreads environment, you can also treat it as a way to synchronize funct
 ## Usage
 To use the ActionScheduler library, follow these steps:  
 
-Include the action_scheduler.h header file in your project.  
-Implement your action callback functions, which should have the following signature:  
+1. Include the action_scheduler.h header file in your project. 
+2. Put somewhere periodically call `ActionScheduler_Proceed(timeElapsed)` to update the scheduler.  
+3. At any time anywhere in your code (even in ISR), schedule your callback using the provided functions, such as `ActionScheduler_Schedule()` and `ActionScheduler_ScheduleReload()`. the callback should have the following signature:  
 `ActionReturn_t myActionCallback(void* arg);`  
 The callback function should return `ACTION_ONESHOT` if the action runs only one time, or `ACTION_RELOAD` if the action should be scheduled again after the specified reload interval.  
-Schedule actions using the provided functions, such as `ActionScheduler_Schedule()` and `ActionScheduler_ScheduleReload()`.  
-Periodically call `ActionScheduler_Proceed(timeElapsed)` to update the scheduler and execute any scheduled actions.  
 
-See the provided example code for a complete demonstration of how to use the ActionScheduler library.  
-Configuration
 The ActionScheduler library can be configured by defining the following preprocessor macro before including the header file:  
 
 `MAX_ACTION_SCHEDULER_NODES`: Specifies the maximum number of scheduled actions the library can handle. The default value is 64, but you can adjust this based on the requirements of your application.  

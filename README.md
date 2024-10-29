@@ -52,7 +52,7 @@ ActionReturn_t myPeriodicFun(void* arg)
 
 void main()
 {
-    static uint32_t lastHalTick = 0;
+    uint32_t lastHalTick = 0;
     ActionScheduler_Clear();
     ActionScheduler_Schedule(1000, myOneShotFun, 1);
     ActionScheduler_Schedule(2000, myPeriodicFun, 2);

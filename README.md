@@ -50,12 +50,28 @@ ActionReturn_t myPeriodicFun(void* arg)
     return ACTION_RELOAD;
 }
 
+static uint8_t runCounter = 0;
+ActionReturn_t my3TimeFun(void* arg)
+{
+	runCounter ++;
+    printf("This is 3 times run function %d\n", (int)arg);
+    if(runCounter < 3)
+    {
+        return ACTION_RELOAD;
+    }
+    else
+    {
+        return ACTION_ONESHOT;
+    }
+}
+
 void main()
 {
     uint32_t lastHalTick = 0;
     ActionScheduler_Clear();
     ActionScheduler_Schedule(1000, myOneShotFun, 1);
     ActionScheduler_Schedule(2000, myPeriodicFun, 2);
+	ActionScheduler_Schedule(1000, my3TimeFun, 3);
 
     while(true)
     {

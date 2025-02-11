@@ -40,7 +40,7 @@ static uint8_t mNodeStartIdx = 0;
 static uint8_t mNodeEndIdx = 0;
 static uint16_t mActiveNodes = 0;
 static uint32_t mProceedingTime = 0;    // specific for scheduling inside callback case
-
+static uint16_t mActiveNodesWaterMark = 0;  // For diagnostic purpose
 // Lock/Unlock for interrupt/thread safety, if we want to use the functions in interrupt handler/multi threads
 // But if not, we don't need these
 static inline uint32_t ListLock(void)
@@ -298,6 +298,12 @@ ActionSchedulerId_t ActionScheduler_ScheduleReload(uint32_t delayedTime, uint32_
         ActionSchedulerId = generateActionIdAt(freeCursor);
     }
     ListUnlock(lock);
+	
+	if(mActiveNodes > mActiveNodesWaterMark)
+    {
+        mActiveNodesWaterMark = mActiveNodes;
+    }
+
     return ActionSchedulerId;
 }
 
@@ -403,4 +409,9 @@ bool ActionScheduler_IsCallbackArmed(ActionCallback_t cb)
         }
     }
     return false;
+}
+
+uint16_t ActionScheduler_GetActiveNodesWaterMark(void)
+{
+    return mActiveNodesWaterMark;
 }

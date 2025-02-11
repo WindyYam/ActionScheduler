@@ -36,6 +36,7 @@ uint32_t ActionScheduler_GetNextEventDelay(void);
 uint32_t ActionScheduler_GetProceedingTime(void);
 void ActionScheduler_ClearProceedingTime(void);
 bool ActionScheduler_IsCallbackArmed(ActionCallback_t cb);
+uint16_t ActionScheduler_GetActiveNodesWaterMark(void);
 
 #ifdef __cplusplus
 }

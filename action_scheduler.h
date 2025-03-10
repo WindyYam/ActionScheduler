@@ -12,11 +12,12 @@ extern "C" {
 #define MAX_ACTION_SCHEDULER_NODES 64U
 #endif
 
-#if MAX_ACTION_SCHEDULER_NODES > 255
+#if MAX_ACTION_SCHEDULER_NODES >= 255
 #error MAX_ACTION_SCHEDULER_NODES can not exceed 255! For now
 #endif
 
-#define ACTION_SCHEDULER_ID_INVALID 0U
+// If you are to refactor the MAX_ACTION_SCHEDULER_NODES to be greater than 254, pay attention to this constant, make it right
+#define ACTION_SCHEDULER_ID_INVALID UINT16_MAX
 
 typedef enum{
     ACTION_ONESHOT,

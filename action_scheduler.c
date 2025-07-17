@@ -220,6 +220,8 @@ bool ActionScheduler_Proceed(uint32_t timeElapsedMs)
                     if (mActiveNodes == 0U) //the linked list is empty, this is the first node
                     {
                         mNodes[currentCursor].delayToPrevious = mNodes[currentCursor].reload;
+			mNodeStartIdx = currentCursor;
+          		mNodeEndIdx = currentCursor;
                     }
                     else
                     {
